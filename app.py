@@ -2,10 +2,6 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from google import genai
-
-# ==========================
-# Load API Key
-# ==========================
 load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
@@ -15,27 +11,16 @@ if not api_key:
     st.stop()
 
 client = genai.Client(api_key=api_key)
-
-# ==========================
-# Streamlit Settings
-# ==========================
 st.set_page_config(
     page_title="Gemini AI Code Reviewer",
     page_icon="🤖",
     layout="wide"
 )
-
-# ==========================
-# Header
-# ==========================
 st.title("🤖 Gemini AI Code Reviewer")
 st.markdown("Review source code using Google's Gemini AI")
 
 st.divider()
 
-# ==========================
-# Language Selection
-# ==========================
 language = st.selectbox(
     "💻 Select Programming Language",
     [
@@ -59,10 +44,6 @@ language = st.selectbox(
         "Other"
     ]
 )
-
-# ==========================
-# File Upload
-# ==========================
 uploaded_file = st.file_uploader(
     "📂 Upload Source Code",
     type=[
@@ -91,10 +72,6 @@ else:
     )
 
 st.divider()
-
-# ==========================
-# Review Button
-# ==========================
 if st.button("🚀 Review Code", use_container_width=True):
 
     if not code.strip():
