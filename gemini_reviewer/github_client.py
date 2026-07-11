@@ -1,9 +1,3 @@
-"""
-GitHub API client for the Gemini AI Code Reviewer.
-
-This module handles all GitHub API interactions including fetching PR details,
-diffs, and creating review comments with proper retry logic and error handling.
-"""
 
 import json
 import logging
@@ -25,20 +19,20 @@ class GitHubClientError(Exception):
 
 
 class PRNotFoundError(GitHubClientError):
-    """Exception raised when PR is not found."""
+    
     pass
 
 
 class RateLimitError(GitHubClientError):
-    """Exception raised when GitHub API rate limit is exceeded."""
+
     pass
 
 
 class GitHubClient:
-    """GitHub API client with retry logic and comprehensive error handling."""
+
     
     def __init__(self, config: GitHubConfig):
-        """Initialize GitHub client with configuration."""
+
         self.config = config
         self._client = Github(config.token)
         self._session = requests.Session()
@@ -51,7 +45,7 @@ class GitHubClient:
         logger.info("Initialized GitHub client")
     
     def get_pr_details_from_event(self, event_path: str) -> PRDetails:
-        """Extract PR details from GitHub Actions event payload."""
+    
         try:
             with open(event_path, "r") as f:
                 event_data = json.load(f)
@@ -60,13 +54,13 @@ class GitHubClient:
             logger.error(f"Failed to load GitHub event data: {str(e)}")
             raise GitHubClientError(f"Failed to load event data: {str(e)}")
         
-        # Handle comment trigger differently from direct PR events
+    
         if "issue" in event_data and "pull_request" in event_data["issue"]:
-            # For comment triggers, we need to get the PR number from the issue
+           
             pull_number = event_data["issue"]["number"]
             repo_full_name = event_data["repository"]["full_name"]
         else:
-            # Original logic for direct PR events
+         
             pull_number = event_data["number"]
             repo_full_name = event_data["repository"]["full_name"]
         
@@ -97,7 +91,7 @@ class GitHubClient:
             repo_obj = self._get_repo_with_retry(f"{owner}/{repo}")
             pr = self._get_pr_with_retry(repo_obj, pull_number)
             
-            # Sanitize PR title and description
+          
             title = self._sanitize_input(pr.title or "")
             description = self._sanitize_input(pr.body or "")
             
@@ -168,14 +162,13 @@ class GitHubClient:
         logger.info(f"Fetching diff for: {repo_name} PR#{pull_number}")
         
         try:
-            # Verify PR exists first
             repo_obj = self._get_repo_with_retry(repo_name)
             pr = self._get_pr_with_retry(repo_obj, pull_number)
             
-            # Use direct API call for diff
+          
             api_url = f"{self.config.api_base_url}/repos/{repo_name}/pulls/{pull_number}.diff"
             
-            # Override Accept header to specifically request diff format
+          
             diff_headers = {
                 'Accept': 'application/vnd.github.v3.diff'
             }
@@ -197,7 +190,7 @@ class GitHubClient:
             else:
                 logger.error(f"Failed to get diff. Status code: {response.status_code}")
                 logger.debug(f"Response content: {response.text[:500]}...")
-                response.raise_for_status()  # This will trigger retry
+                response.raise_for_status() 
                 return ""
         
         except requests.exceptions.Timeout:
@@ -227,7 +220,6 @@ class GitHubClient:
             repo_obj = self._get_repo_with_retry(pr_details.repo_full_name)
             pr = self._get_pr_with_retry(repo_obj, pr_details.pull_number)
             
-            # Validate and convert comments
             github_comments = []
             for comment in comments:
                 if not isinstance(comment, ReviewComment):
@@ -244,7 +236,7 @@ class GitHubClient:
             
             logger.info(f"Creating review with {len(github_comments)} valid comments")
             
-            # Create the review
+          
             review_body = self._generate_review_summary(comments)
             review = pr.create_review(
                 body=review_body,
@@ -262,17 +254,17 @@ class GitHubClient:
     def _validate_and_sanitize_comment(self, comment: ReviewComment) -> Optional[Dict[str, Any]]:
         """Validate and sanitize a review comment."""
         try:
-            # Check required fields
+           
             if not all([comment.body, comment.path]):
                 logger.warning(f"Comment missing required fields: {comment}")
                 return None
             
-            # Validate position
+           
             if not isinstance(comment.position, int) or comment.position <= 0:
                 logger.warning(f"Invalid position {comment.position} in comment")
                 return None
             
-            # Sanitize content (preserve markdown in body, but sanitize path)
+           
             sanitized_comment = {
                 'body': self._sanitize_input(str(comment.body), preserve_markdown=True),
                 'path': self._sanitize_input(str(comment.path), preserve_markdown=False),
@@ -310,16 +302,15 @@ class GitHubClient:
             return str(text) if text is not None else ""
         
         if preserve_markdown:
-            # For markdown content (like comment bodies), only remove dangerous control characters
-            # Don't HTML escape as it breaks markdown formatting in GitHub
+           
             sanitized = ''.join(char for char in text if ord(char) >= 32 or char in '\t\n\r')
             return sanitized.strip()
         else:
             import html
-            # HTML escape to prevent XSS (only for non-markdown fields like paths)
+           
             sanitized = html.escape(text)
             
-            # Remove potential command injection characters
+           
             dangerous_chars = ['`', '$', '$(', '${', '|', '&&', '||', ';', '&']
             for char in dangerous_chars:
                 sanitized = sanitized.replace(char, '')
@@ -354,7 +345,7 @@ class GitHubClient:
             for file in pr.get_files():
                 files.append({
                     'filename': file.filename,
-                    'status': file.status,  # added, removed, modified, renamed
+                    'status': file.status, 
                     'additions': file.additions,
                     'deletions': file.deletions,
                     'changes': file.changes,
@@ -375,7 +366,7 @@ class GitHubClient:
             logger.debug(f"Rate limit object type: {type(rate_limit)}")
             logger.debug(f"Rate limit attributes: {dir(rate_limit)}")
             
-            # Handle different PyGithub versions
+         
             if hasattr(rate_limit, 'core'):
                 return {
                     'core': {
@@ -385,7 +376,7 @@ class GitHubClient:
                     }
                 }
             elif hasattr(rate_limit, 'rate'):
-                # Newer PyGithub versions
+             
                 return {
                     'core': {
                         'limit': rate_limit.rate.limit,
@@ -394,7 +385,7 @@ class GitHubClient:
                     }
                 }
             else:
-                # If structure is unknown, just return a valid response
+            
                 logger.warning(f"Unknown rate limit structure: {rate_limit}")
                 return {
                     'core': {
@@ -405,7 +396,7 @@ class GitHubClient:
                 }
         except Exception as e:
             logger.warning(f"Failed to check rate limit: {str(e)}")
-            # Return a valid structure so connection test doesn't fail
+         
             return {
                 'core': {
                     'limit': 5000,
